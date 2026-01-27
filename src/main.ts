@@ -1,99 +1,149 @@
-import {App, Editor, MarkdownView, Modal, Notice, Plugin} from 'obsidian';
-import {DEFAULT_SETTINGS, MyPluginSettings, SampleSettingTab} from "./settings";
+import { App, Plugin, TFile, Notice } from 'obsidian';
+import { PluginSettings, DEFAULT_SETTINGS, SettingTab } from './settings';
+import { MetricsRegistry, Metric } from './metrics';
+import yaml from "js-yaml";
 
-// Remember to rename these classes and interfaces!
+export default class AverageParagraphLengthPlugin extends Plugin {
+    settings: PluginSettings;
+    metricsRegistry: MetricsRegistry;
 
-export default class MyPlugin extends Plugin {
-	settings: MyPluginSettings;
+    async onload() {
+        console.log('Loading Note Metrics Plugin');
 
-	async onload() {
-		await this.loadSettings();
+        this.metricsRegistry = new MetricsRegistry();
 
-		// This creates an icon in the left ribbon.
-		this.addRibbonIcon('dice', 'Sample', (evt: MouseEvent) => {
-			// Called when the user clicks the icon.
-			new Notice('This is a notice!');
+        await this.loadSettings();
+
+        this.metricsRegistry.setPluginSettings(this.settings);
+
+        this.metricsRegistry.updateQualityScoreConfig(this.settings.qualityScoreConfig);
+
+        this.applySavedMetricStates();
+
+        this.addSettingTab(new SettingTab(this.app, this));
+
+        this.addRibbonIcon('calculator', 'Calculate Note Metrics', async () => {
+            await this.calculateMetricsForAllNotes();
+        });
+
+        this.addCommand({
+            id: 'calculate-all-metrics',
+            name: 'Calculate metrics for all notes',
+            callback: async () => {
+                await this.calculateMetricsForAllNotes();
+            }
+        });
+
+        this.addCommand({
+			id: "clean-yaml-all-notes",
+			name: "Delete selected YAML tags (all notes)",
+			callback: () => this.deletePluginYamlTags(this.settings.enabledMetrics)
 		});
+    }
 
-		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
-		const statusBarItemEl = this.addStatusBarItem();
-		statusBarItemEl.setText('Status bar text');
+    async loadSettings() {
+        this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    }
 
-		// This adds a simple command that can be triggered anywhere
-		this.addCommand({
-			id: 'open-modal-simple',
-			name: 'Open modal (simple)',
-			callback: () => {
-				new SampleModal(this.app).open();
+    async saveSettings() {
+        await this.saveData(this.settings);
+    }
+
+    applySavedMetricStates() {
+        const allMetrics = this.metricsRegistry.getAll();
+        
+        for (const metric of allMetrics) {
+            const isEnabled = this.settings.enabledMetrics.includes(metric.id);
+            this.metricsRegistry.setEnabled(metric.id, isEnabled);
+        }
+    }
+
+    async deletePluginYamlTags(enabledMetrics: string[]) {
+		const files = this.app.vault.getMarkdownFiles();
+		let modifiedCount = 0;
+
+		for (const file of files) {
+			const content = await this.app.vault.read(file);
+			if (!content.startsWith("---")) continue;
+
+			const match = content.match(/^---\n([\s\S]*?)\n---/);
+			if (!match) continue;
+
+			let data: any;
+			try {
+				data = yaml.load(match[1] ?? "");
+			} catch {
+				continue;
 			}
-		});
-		// This adds an editor command that can perform some operation on the current editor instance
-		this.addCommand({
-			id: 'replace-selected',
-			name: 'Replace selected content',
-			editorCallback: (editor: Editor, view: MarkdownView) => {
-				editor.replaceSelection('Sample editor command');
-			}
-		});
-		// This adds a complex command that can check whether the current state of the app allows execution of the command
-		this.addCommand({
-			id: 'open-modal-complex',
-			name: 'Open modal (complex)',
-			checkCallback: (checking: boolean) => {
-				// Conditions to check
-				const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-				if (markdownView) {
-					// If checking is true, we're simply "checking" if the command can be run.
-					// If checking is false, then we want to actually perform the operation.
-					if (!checking) {
-						new SampleModal(this.app).open();
-					}
 
-					// This command will only show up in Command Palette when the check function returns true
-					return true;
+			if (!data || typeof data !== "object") continue;
+
+			let changed = false;
+			for (const key of enabledMetrics) {
+				if (key in data) {
+					delete data[key];
+					changed = true;
 				}
-				return false;
 			}
-		});
 
-		// This adds a settings tab so the user can configure various aspects of the plugin
-		this.addSettingTab(new SampleSettingTab(this.app, this));
+			if (!changed) continue;
 
-		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
-		// Using this function will automatically remove the event listener when this plugin is disabled.
-		this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
-			new Notice("Click");
-		});
+			const newYaml = Object.keys(data).length
+				? `---\n${yaml.dump(data).trim()}\n---`
+				: "";
 
-		// When registering intervals, this function will automatically clear the interval when the plugin is disabled.
-		this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
+			const newContent = newYaml + content.slice(match[0].length + (newYaml.length > 0 ? 0 : 1));
+			await this.app.vault.modify(file, newContent);
+			modifiedCount++;
+		}
 
+		new Notice(`Removed plugin YAML tags from ${modifiedCount} notes`);
 	}
 
-	onunload() {
-	}
+    async calculateMetricsForAllNotes() {
+        const files = this.app.vault.getMarkdownFiles();
+        const enabledMetrics = this.metricsRegistry.getEnabled();
 
-	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData() as Partial<MyPluginSettings>);
-	}
+        if (enabledMetrics.length === 0) {
+            new Notice('No metrics enabled. Please enable metrics in settings.');
+            return;
+        }
 
-	async saveSettings() {
-		await this.saveData(this.settings);
-	}
-}
+        let processedCount = 0;
+        let errorCount = 0;
 
-class SampleModal extends Modal {
-	constructor(app: App) {
-		super(app);
-	}
+        new Notice(`Calculating ${enabledMetrics.length} metric(s) for ${files.length} note(s)...`);
 
-	onOpen() {
-		let {contentEl} = this;
-		contentEl.setText('Woah!');
-	}
+        for (const file of files) {
+            try {
+                await this.processFile(file, enabledMetrics);
+                processedCount++;
+            } catch (error) {
+                console.error(`Error processing file ${file.path}:`, error);
+                errorCount++;
+            }
+        }
 
-	onClose() {
-		const {contentEl} = this;
-		contentEl.empty();
-	}
+        new Notice(`Completed! Processed: ${processedCount}, Errors: ${errorCount}`);
+    }
+
+    async processFile(file: TFile, metrics: any[]) {
+        const content = await this.app.vault.read(file);
+        
+        const results = this.metricsRegistry.calculateAll(content, metrics);
+        //console.log(results);
+        await this.updateFrontmatter(file, results);
+    }
+
+    async updateFrontmatter(file: TFile, metrics: Record<string, number>) {
+        await this.app.fileManager.processFrontMatter(file, (frontmatter) => {
+            for (const [key, value] of Object.entries(metrics)) {
+                frontmatter[key] = value;
+            }
+        });
+    }
+
+    onunload() {
+        console.log('Unloading Note Metrics Plugin');
+    }
 }

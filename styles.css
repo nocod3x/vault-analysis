@@ -1,8 +1,11 @@
-/*
+.settings-small-text {
+    font-size: 0.8em;
+    margin-left: 1.5em;
+    margin-top: 0;
+    margin-top: 0.2em;
+}
 
-This CSS file will be included with your plugin, and
-available in the app when your plugin is enabled.
-
-If your plugin does not need CSS, delete this file.
-
-*/
+.settings-header {
+    margin-bottom: 0 !important;
+    padding-bottom: 0 !important;
+}
