@@ -273,7 +273,7 @@ export class MetricsRegistry {
         this.register({
             id: 'lix',
             name: 'LIX (Readability Index)',
-            description: 'LIX = (words/sentences) + (long_words*100/words). <30=easy, 30-40=medium, 40-50=hard, >50=very hard',
+            description: 'LIX = (words/sentences) + (long_words*100/words). <30=very easy, 30-40=easy, 40-50=medium, 50-60=hard, >60=very hard',
             frontmatterKey: 'lix',
             category: 'syntax',
             enabled: true,

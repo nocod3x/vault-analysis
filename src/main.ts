@@ -35,9 +35,15 @@ export default class AverageParagraphLengthPlugin extends Plugin {
         });
 
         this.addCommand({
-			id: "clean-yaml-all-notes",
-			name: "Delete selected YAML tags (all notes)",
+			id: "clean-yaml-selected-notes",
+			name: "Delete selected YAML tags for all notes",
 			callback: () => this.deletePluginYamlTags(this.settings.enabledMetrics)
+		});
+
+        this.addCommand({
+			id: "clean-yaml-all-notes",
+			name: "Delete all YAML tags for all notes",
+			callback: () => this.deletePluginYamlTags(DEFAULT_SETTINGS.enabledMetrics)
 		});
     }
 

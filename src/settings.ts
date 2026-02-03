@@ -236,12 +236,22 @@ export class SettingTab extends PluginSettingTab {
 			cls: 'settings-small-text'
         });
 
+        new Setting(containerEl)
+            .setName('Calculate metrics')
+            .setDesc('Calculate enabled metrics for all notes')
+            .addButton(button => button
+                .setButtonText('Calculate')
+                .setCta()
+                .onClick(async () => {
+                    await this.plugin.calculateMetricsForAllNotes();                    
+                }));
+
        new Setting(containerEl)
             .setName('Reset to defaults')
-            .setDesc('Reset all quality score settings to default values')
+            .setDesc('Reset all settings to default values')
             .addButton(button => button
                 .setButtonText('Reset')
-                .setWarning()
+                .setCta()
                 .onClick(async () => {
                     this.plugin.settings = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
                     await this.plugin.saveSettings();
@@ -251,38 +261,30 @@ export class SettingTab extends PluginSettingTab {
                     
                     this.display();
                 }));
-        
+
         new Setting(this.containerEl)
-			.setName("Delete all Plugin YAML Tags")
-			.setDesc("Removes plugin-related YAML keys from all notes")
+			.setName("Delete selected Plugin YAML Tags")
+			.setDesc("Removes selected plugin-related YAML keys from all notes")
 			.addButton(btn =>
 				btn
-					.setButtonText("Delete")
-					.setCta()
+					.setButtonText("Delete enabled metrics")
+					.setWarning()
 					.onClick(async () => {
 						await this.plugin.deletePluginYamlTags(this.plugin.settings.enabledMetrics);
 					})
 			);
-        
-		// need or not? 
-		// containerEl.createEl('h3', { text: 'Frontmatter Keys' });
-        // const keysContainer = containerEl.createEl('div', { cls: 'setting-item-description' });
-        // keysContainer.createEl('p', { text: 'The following keys will be added to your notes:' });
-        
-        // const keysList = keysContainer.createEl('ul');
-        // for (const category of categories) {
-        //     const metrics = this.plugin.metricsRegistry.getByCategory(category.id as any);
-        //     if (metrics.length > 0) {
-        //         const categoryItem = keysList.createEl('li');
-        //         categoryItem.createEl('strong', { text: category.name });
-        //         const subList = categoryItem.createEl('ul');
-        //         for (const metric of metrics) {
-        //             const item = subList.createEl('li');
-        //             item.createEl('code', { text: metric.frontmatterKey });
-        //             item.appendText(`: ${metric.description}`);
-        //         }
-        //     }
-        // }
+
+        new Setting(this.containerEl)
+			.setName("Delete all Plugin YAML Tags")
+			.setDesc("Removes all plugin-related YAML keys from all notes")
+			.addButton(btn =>
+				btn
+					.setButtonText("Delete all metrics")
+					.setWarning()
+					.onClick(async () => {
+						await this.plugin.deletePluginYamlTags(DEFAULT_SETTINGS.enabledMetrics);
+					})
+			);
     }
 
     private calculateWeightSum(enabledForQuality: string[]): number {
