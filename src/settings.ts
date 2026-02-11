@@ -185,20 +185,6 @@ export class SettingTab extends PluginSettingTab {
         this.addWeightSetting(containerEl, 'exclamation_coefficient', 'Exclamation Coefficient', enabledForQuality);
         this.addWeightSetting(containerEl, 'internal_link_density', 'Internal Link Density', enabledForQuality);
         this.addWeightSetting(containerEl, 'external_link_density', 'External Link Density', enabledForQuality);
-		
-		// prev variant 
-        //const enabledWeights = Object.entries(this.plugin.settings.qualityScoreConfig.weights)
-        //    .filter(([key]) => enabledForQuality.includes(key))
-        //    .map(([, weight]) => weight as number);
-        
-        //const totalWeight = enabledWeights.reduce((sum, w) => sum + w, 0);
-
-		// if (totalWeight !== 1.0) {
-        //     weightSumEl.createEl('span', { 
-        //         text: '(Warning: should be 1.0)',
-        //         cls: 'mod-warning'
-        //     });
-        // }
         
         this.weightSumEl = containerEl.createEl('div', { cls: 'setting-item' });
 

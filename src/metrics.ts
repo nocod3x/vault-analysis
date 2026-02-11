@@ -1,3 +1,22 @@
+declare namespace Intl {
+    interface SegmenterOptions {
+        granularity?: 'grapheme' | 'word' | 'sentence';
+        localeMatcher?: 'best fit' | 'lookup';
+    }
+
+    interface SegmenterSegment {
+        segment: string;
+        index: number;
+        input: string;
+        isWordLike?: boolean;
+    }
+
+    class Segmenter {
+        constructor(locale?: string, options?: SegmenterOptions);
+        segment(input: string): IterableIterator<SegmenterSegment>;
+    }
+}
+
 export interface Metric {
     id: string;
     name: string;
@@ -20,19 +39,44 @@ export function isCompositeMetric(metric: AnyMetric): metric is CompositeMetric 
 }
 
 export class TextUtils {
-    static removeFrontmatter(content: string): string {
-        return content.replace(/^---\n[\s\S]*?\n---\n/, '');
+    static removeFrontmatter2(content: string): string {
+        return content.replace(/^---\n[\s\S]*?\n---\n/, ''); // remove YAML frontmatter wrapped in --- (Unix line endings)
     }
 
     static getParagraphs(content: string): string[] {
         const withoutFrontmatter = this.removeFrontmatter(content);
         return withoutFrontmatter
-            .split(/\n\s*\n/)
+            .split(/\n\s*\n/) // split text into paragraphs by blank lines (allowing spaces between)
             .map(p => p.trim())
             .filter(p => p.length > 0);
     }
 
-    static cleanMarkdown(text: string): string {
+    static removeFrontmatter(content: string): string {
+return content.replace(/^---\r?\n[\s\S]*?\n---\r?\n/m, ''); // remove YAML frontmatter wrapped in --- (supports Windows and Unix line endings)
+    }
+
+    //problem is bigger than I expected 
+    // # head \n\n text \n\n text
+    // text \n\n text \n\n text
+    // # head \n\n text \n\n #head \n\n text 
+    // \n & \r\n
+    static getParagraphsTest(content: string): string[] {
+        const withoutFrontmatter = this.removeFrontmatter(content); 
+        return withoutFrontmatter
+            .replace(/\r\n/g, '\n') // normalize Windows line endings to Unix
+            .replace(/\r/g, '\n') // normalize old Mac line endings to Unix
+            .replace(/^(\s*#{1,6}\s+.*)\n{2,}/gm, '$1\n') // prevent headers from creating extra paragraph breaks
+            .replace(/^\s*#{1,6}\s+/gm, '') // remove header markers (#, ##, etc.)
+            .replace(/^[-*_]{3,}\s*$/gm, '') // remove horizontal rules
+            .replace(/\n{3,}/g, '\n\n') // collapse excessive blank lines to max two
+            .replace(/([^\n])\n(```)/g, '$1\n\n$2') // ensure blank line before code blocks
+            .replace(/(```[^`]*```)\n([^\n])/g, '$1\n\n$2') // ensure blank line after code blocks
+            .split(/\n\n+/) // split text into paragraphs by double line breaks
+            .map(p => p.trim()) // trim whitespace around each paragraph
+            .filter(p => p.length > 0); // remove empty paragraphs
+    }
+
+    static cleanMarkdown2(text: string): string {
         return text
             .replace(/!\[.*?\]\(.*?\)/g, '') // delete img
             .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1') // replace links with text
@@ -40,48 +84,150 @@ export class TextUtils {
             .trim();
     }
 
-    static countWords(text: string): number {
-        const cleanText = this.cleanMarkdown(text);
-        const words = cleanText.split(/\s+/).filter(w => w.length > 0);
+    static cleanMarkdown(text: string): string {
+        return text
+            .replace(/```[\s\S]*?```/g, '') // remove fenced code blocks (``` ... ```)
+            .replace(/`[^`]+`/g, '') // remove inline code (`code`)
+            .replace(/<!--[\s\S]*?-->/g, '') // remove HTML comments
+            .replace(/!\[([^\]]*)\]\([^\)]+\)/g, '$1') // replace images with alt text
+            .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1') // replace inline links with text only
+            .replace(/\[([^\]]+)\]\[[^\]]+\]/g, '$1') // replace reference links with text only
+            .replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_, link, display) => display || link) // handle wiki links [[link|text]]
+            .replace(/^#{1,6}\s+/gm, '') // remove header markers (#, ##, etc.)
+            .replace(/^>\s+/gm, '') // remove blockquote markers (>)
+            .replace(/^[-*_]{3,}\s*$/gm, '') // remove horizontal rules (---, ***, ___)
+            .replace(/(\*\*|__)(.*?)\1/g, '$2') // remove bold formatting
+            .replace(/(\*|_)(.*?)\1/g, '$2') // remove italic formatting
+            .replace(/~~(.*?)~~/g, '$1') // remove strikethrough formatting
+            .replace(/==(.*?)==/g, '$1') // remove highlight formatting
+            .replace(/^[\s]*[-*+]\s+/gm, '') // remove unordered list markers
+            .replace(/^[\s]*\d+\.\s+/gm, '') // remove ordered list markers
+            .replace(/^[\s]*[-*+]\s+\[(x| )\]\s+/gmi, '') // remove task list checkboxes
+            .replace(/\[\^[^\]]+\]/g, '') // remove footnote references
+            .replace(/\s+/g, ' ') // collapse multiple spaces
+            .trim(); // trim leading and trailing whitespace
+    }
+
+    static countWords2(text: string, locale: string = 'en'): number {
+        if (!text) {
+            return 0;
+        }
+        const plain = this.cleanMarkdown(text);
+
+        const segmenter = new Intl.Segmenter(locale, { granularity: 'word' });
+        const words = [...segmenter.segment(plain)].filter(w => w.isWordLike);
         return words.length;
     }
 
-    static getSentences(text: string): string[] {
-        //delete 
-        let processedText = text
-            // english
-            .replace(/\betc\./gi, 'ETC_ABR')
-            .replace(/\be\.g\./gi, 'EG_ABR')
-            .replace(/\bi\.e\./gi, 'IE_ABR')
-            .replace(/\bvs\./gi, 'VS_ABR')
-            .replace(/\bMr\./g, 'MR_ABR')
-            .replace(/\bMrs\./g, 'MRS_ABR')
-            .replace(/\bMs\./g, 'MS_ABR')
-            .replace(/\bDr\./g, 'DR_ABR')
-            .replace(/\bProf\./g, 'PROF_ABR');
+    static countWords(text: string, locale: string = 'en'): number {
+        if (!text?.trim()) {
+            return 0;
+        }
+        
+        const plain = this.cleanMarkdown(text);
+        
+        try {
+            const segmenter = new Intl.Segmenter(locale, { granularity: 'word' });
+            const words = [...segmenter.segment(plain)].filter(w => w.isWordLike);
+            
+            return words.length;
+        } catch (error) {
+            console.warn(`Invalid locale "${locale}", falling back to "en"`, error);
+            return this.countWords(text, 'en');
+        }
+    }
 
-        const sentences = processedText
-            .split(/[.!?]+/)
-            .map(s => s.trim())
-            .filter(s => s.length > 0);
+    static getSentences2(text: string, locale: string = 'en'): string[] {
+        if (!text) {
+            return [];
+        }
 
-        // return to original
-        return sentences.map(s => s
-            //english
-            .replace(/ETC_ABR/g, 'etc.')
-            .replace(/EG_ABR/g, 'e.g.')
-            .replace(/IE_ABR/g, 'i.e.')
-            .replace(/VS_ABR/g, 'vs.')
-            .replace(/MR_ABR/g, 'Mr.')
-            .replace(/MRS_ABR/g, 'Mrs.')
-            .replace(/MS_ABR/g, 'Ms.')
-            .replace(/DR_ABR/g, 'Dr.')
-            .replace(/PROF_ABR/g, 'Prof.')
-        );
+        const segmenter = new Intl.Segmenter(locale, { 
+            granularity: 'sentence' 
+        });
+        const segmentsIterator = segmenter.segment(text);
+        const sentences = Array.from(segmentsIterator).map(item => item.segment);
+        return sentences.filter(s => s.trim().length > 0);
+    }
+    static getSentences(text: string, locale: string = 'en', cleanMd: boolean = true): string[] {
+        if (!text?.trim()) {
+            return [];
+        }
+        
+        let processedText = cleanMd ? this.cleanMarkdown(text) : text;
+        processedText = processedText
+            .replace(/([.!?])[.!?]+/g, '$1') // Multiple punctuation -> single
+            .replace(/\s+/g, ' ') // Normalize whitespace
+            .trim();
+        
+        try {
+            const segmenter = new Intl.Segmenter(locale, { 
+                granularity: 'sentence' 
+            });
+            
+            return Array.from(segmenter.segment(processedText))
+                .map(item => item.segment.trim())
+                .filter(s => s.length > 0);
+        } catch (error) {
+            console.warn(`Invalid locale "${locale}", falling back to "en"`, error);
+            return this.getSentences(text, 'en', cleanMd);
+        }
+    }
+
+    static countLongWords2(text: string): number {
+        const cleanText = this.cleanMarkdown(text);
+        const words = cleanText.split(/\s+/); // split by whitespace
+        return words.filter(w => w.length > 6).length;
+    }
+
+    static countLongWords(text: string, minLength: number = 6, locale: string = 'en'): number {
+        if (!text?.trim() || minLength < 1) {
+            return 0;
+        }
+        
+        const cleanText = this.cleanMarkdown(text);
+        
+        try {
+            const segmenter = new Intl.Segmenter(locale, { granularity: 'word' });
+            return [...segmenter.segment(cleanText)]
+                .filter(w => w.isWordLike && w.segment.length > minLength)
+                .length;
+        } catch (error) {
+            console.warn(`Invalid locale "${locale}", falling back to simple split`, error);
+            return cleanText.split(/\s+/) // split by whitespace
+                .filter(w => w.length > minLength && /\w/.test(w))
+                .length;
+        }
+    }
+
+    static getTags2(content: string): string[] {
+        const regex = /#([a-zA-Zа-яА-ЯёЁ0-9_\-\/]+)/g;
+        const matches: string[] = [];
+        let match;
+        while ((match = regex.exec(content)) !== null) {
+            matches.push(match[1] ?? "");
+        }
+        return matches;
+    }
+
+    static getTags(content: string, unique: boolean = true): string[] {
+        if (!content?.trim()) {
+            return [];
+        }
+        
+        const regex = /#([\p{L}\p{N}_\-\/]+)/gu; // match hashtags with Unicode letters, numbers, _, -, /
+        const matches: string[] = [];
+        let match;
+        
+        while ((match = regex.exec(content)) !== null) {
+            matches.push(match[1] ?? "");
+        }
+        
+        return unique ? [...new Set(matches)] : matches;
     }
 
     static getInternalLinks(content: string): string[] {
-        const regex = /\[\[([^\]]+)\]\]/g;
+        const regex = /\[\[([^\]]+)\]\]/g; // match wiki-style [[text]] links
         const matches: string[] = [];
         let match;
         while ((match = regex.exec(content)) !== null) {
@@ -93,13 +239,13 @@ export class TextUtils {
     static getExternalLinks(content: string): string[] {
         const links: string[] = [];
         
-        const markdownRegex = /\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g;
+        const markdownRegex = /\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g; // match markdown links [text](http://...)
         let match;
         while ((match = markdownRegex.exec(content)) !== null) {
             links.push(match[2] ?? "");
         }
         
-        const urlRegex = /(?<!\]\()https?:\/\/[^\s\)]+/g;
+        const urlRegex = /(?<!\]\()https?:\/\/[^\s\)]+/g; // match URLs not part of markdown links
         while ((match = urlRegex.exec(content)) !== null) {
             links.push(match[0]);
         }
@@ -107,28 +253,12 @@ export class TextUtils {
         return links;
     }
 
-    static getTags(content: string): string[] {
-        const regex = /#([a-zA-Zа-яА-ЯёЁ0-9_\-\/]+)/g;
-        const matches: string[] = [];
-        let match;
-        while ((match = regex.exec(content)) !== null) {
-            matches.push(match[1] ?? "");
-        }
-        return matches;
-    }
-
     static countQuestions(text: string): number {
-        return (text.match(/\?/g) || []).length;
+        return (text.replace(/([.!?])[.!?]+/g, '$1').match(/\?/g) || []).length; // Multiple punctuation -> single + match ?
     }
 
     static countExclamations(text: string): number {
-        return (text.match(/!/g) || []).length;
-    }
-
-    static countLongWords(text: string): number {
-        const cleanText = this.cleanMarkdown(text);
-        const words = cleanText.split(/\s+/);
-        return words.filter(w => w.length > 6).length;
+        return (text.replace(/([.!?])[.!?]+/g, '$1').match(/!/g) || []).length; // Multiple punctuation -> single + match !
     }
 }
 
@@ -278,8 +408,9 @@ export class MetricsRegistry {
             category: 'syntax',
             enabled: true,
             calculate: (content: string): number => {
+                const currentLocale = window.moment.locale();
                 const withoutFrontmatter = TextUtils.removeFrontmatter(content);
-                const sentences = TextUtils.getSentences(withoutFrontmatter);
+                const sentences = TextUtils.getSentences(withoutFrontmatter, currentLocale);
                 const totalWords = TextUtils.countWords(withoutFrontmatter);
                 const longWords = TextUtils.countLongWords(withoutFrontmatter);
 
@@ -302,8 +433,9 @@ export class MetricsRegistry {
             category: 'semantics',
             enabled: true,
             calculate: (content: string): number => {
+                const currentLocale = window.moment.locale();
                 const withoutFrontmatter = TextUtils.removeFrontmatter(content);
-                const sentences = TextUtils.getSentences(withoutFrontmatter);
+                const sentences = TextUtils.getSentences(withoutFrontmatter, currentLocale);
                 const questions = TextUtils.countQuestions(withoutFrontmatter);
 
                 if (sentences.length === 0) return 0;
@@ -321,8 +453,9 @@ export class MetricsRegistry {
             category: 'semantics',
             enabled: true,
             calculate: (content: string): number => {
+                const currentLocale = window.moment.locale();
                 const withoutFrontmatter = TextUtils.removeFrontmatter(content);
-                const sentences = TextUtils.getSentences(withoutFrontmatter);
+                const sentences = TextUtils.getSentences(withoutFrontmatter, currentLocale);
                 const exclamations = TextUtils.countExclamations(withoutFrontmatter);
 
                 if (sentences.length === 0) return 0;
@@ -444,7 +577,6 @@ export class MetricsRegistry {
                         const normalizedScore = normalize(value, range);
                         scores[metricId] = normalizedScore;
                         totalWeight += weight;
-                        //console.log(`Metric: ${metricId}, Value: ${value}, Normalized: ${normalizedScore}, Weight: ${weight}`);
                     }
                 }
 
@@ -460,15 +592,10 @@ export class MetricsRegistry {
                         const weight = weights[metricId];
                         const contribution = score * weight;
                         weightedSum += contribution;
-                        //console.log(`${metricId}: score=${score} * weight=${weight} = ${contribution}`);
                     }
                 }
-
-                //console.log(`Total: weightedSum=${weightedSum}, totalWeight=${totalWeight}`);
-
                 const normalizedScore = weightedSum / totalWeight;
                 const finalScore = Math.round(normalizedScore * 100 * 100) / 100;
-                //console.log(`Final score: ${normalizedScore} * 100 = ${finalScore}`);
                 
                 return finalScore;
             }

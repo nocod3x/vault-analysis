@@ -8,7 +8,7 @@ export default class AverageParagraphLengthPlugin extends Plugin {
     metricsRegistry: MetricsRegistry;
 
     async onload() {
-        console.log('Loading Note Metrics Plugin');
+        //console.log('Loading Note Metrics Plugin');
 
         this.metricsRegistry = new MetricsRegistry();
 
@@ -137,7 +137,6 @@ export default class AverageParagraphLengthPlugin extends Plugin {
         const content = await this.app.vault.read(file);
         
         const results = this.metricsRegistry.calculateAll(content, metrics);
-        //console.log(results);
         await this.updateFrontmatter(file, results);
     }
 
@@ -150,6 +149,6 @@ export default class AverageParagraphLengthPlugin extends Plugin {
     }
 
     onunload() {
-        console.log('Unloading Note Metrics Plugin');
+        //console.log('Unloading Note Metrics Plugin');
     }
 }
