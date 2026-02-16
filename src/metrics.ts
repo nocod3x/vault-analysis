@@ -39,49 +39,66 @@ export function isCompositeMetric(metric: AnyMetric): metric is CompositeMetric 
 }
 
 export class TextUtils {
-    static removeFrontmatter2(content: string): string {
-        return content.replace(/^---\n[\s\S]*?\n---\n/, ''); // remove YAML frontmatter wrapped in --- (Unix line endings)
+    static removeFrontmatter(content: string): string {
+        return content.replace(/^---\r?\n[\s\S]*?\n---\r?\n/m, ''); // remove YAML frontmatter wrapped in --- (supports Windows and Unix line endings)
     }
 
+    //test dirty variant 
     static getParagraphs(content: string): string[] {
         const withoutFrontmatter = this.removeFrontmatter(content);
-        return withoutFrontmatter
-            .split(/\n\s*\n/) // split text into paragraphs by blank lines (allowing spaces between)
-            .map(p => p.trim())
-            .filter(p => p.length > 0);
-    }
+        const normalized = withoutFrontmatter.replace(/\r\n/g, '\n');
+        
+        const blocks: string[] = normalized
+            .split(/\n\s*\n/)
+            .map(b => b.trim())
+            .filter(b => b.length > 0);
+        
+        const paragraphs: string[] = [];
+        let i = 0;
+        
+        while (i < blocks.length) {
+            const block: string = blocks[i] ?? "";
+            
+            const lines: string[] = block.split('\n');
+            const headingIndex = lines.findIndex((line: string) => line.trim().startsWith('#'));
+            
+            if (headingIndex !== -1) {
+                if (headingIndex > 0) {
+                    const beforeHeading = lines.slice(0, headingIndex).join(' ').trim();
+                    beforeHeading && paragraphs.push(beforeHeading);
+                }
+                
+                const headingText = lines[headingIndex]?.replace(/^#+\s*/, '').trim();
+                const afterHeading = lines.slice(headingIndex + 1).join(' ').trim();
+                
+                if (afterHeading) {
+                    paragraphs.push(`${headingText} ${afterHeading}`);
+                    i++;
+                } else if (i + 1 < blocks.length && !blocks[i + 1]?.trim().startsWith('#')) {
+                    const nextBlock = blocks[i + 1]?.replace(/\n/g, ' ').trim();
+                    paragraphs.push(`${headingText} ${nextBlock}`);
+                    i += 2;
+                } else {
+                    headingText && paragraphs.push(headingText);
+                    i++;
+                }
+            } else {
+                paragraphs.push(block.replace(/\n/g, ' ').trim());
+                i++;
+            }
+        }
+        let newParagraphs: string[] = [];
+        for (let i = 0; i < paragraphs.length; i++) {
+            if (paragraphs[i]?.contains('#')) {
+                const splitedParagraph = paragraphs[i]?.replace(/#+/g, '#').trim().split('#');
+                splitedParagraph && newParagraphs.push(...splitedParagraph);
+            }
+            else {
+                paragraphs[i] && newParagraphs.push(paragraphs[i]!);
+            }
+        }
 
-    static removeFrontmatter(content: string): string {
-return content.replace(/^---\r?\n[\s\S]*?\n---\r?\n/m, ''); // remove YAML frontmatter wrapped in --- (supports Windows and Unix line endings)
-    }
-
-    //problem is bigger than I expected 
-    // # head \n\n text \n\n text
-    // text \n\n text \n\n text
-    // # head \n\n text \n\n #head \n\n text 
-    // \n & \r\n
-    static getParagraphsTest(content: string): string[] {
-        const withoutFrontmatter = this.removeFrontmatter(content); 
-        return withoutFrontmatter
-            .replace(/\r\n/g, '\n') // normalize Windows line endings to Unix
-            .replace(/\r/g, '\n') // normalize old Mac line endings to Unix
-            .replace(/^(\s*#{1,6}\s+.*)\n{2,}/gm, '$1\n') // prevent headers from creating extra paragraph breaks
-            .replace(/^\s*#{1,6}\s+/gm, '') // remove header markers (#, ##, etc.)
-            .replace(/^[-*_]{3,}\s*$/gm, '') // remove horizontal rules
-            .replace(/\n{3,}/g, '\n\n') // collapse excessive blank lines to max two
-            .replace(/([^\n])\n(```)/g, '$1\n\n$2') // ensure blank line before code blocks
-            .replace(/(```[^`]*```)\n([^\n])/g, '$1\n\n$2') // ensure blank line after code blocks
-            .split(/\n\n+/) // split text into paragraphs by double line breaks
-            .map(p => p.trim()) // trim whitespace around each paragraph
-            .filter(p => p.length > 0); // remove empty paragraphs
-    }
-
-    static cleanMarkdown2(text: string): string {
-        return text
-            .replace(/!\[.*?\]\(.*?\)/g, '') // delete img
-            .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1') // replace links with text
-            .replace(/[#*_~`]/g, '') // delete markdown symbols
-            .trim();
+        return newParagraphs;
     }
 
     static cleanMarkdown(text: string): string {
@@ -108,17 +125,6 @@ return content.replace(/^---\r?\n[\s\S]*?\n---\r?\n/m, ''); // remove YAML front
             .trim(); // trim leading and trailing whitespace
     }
 
-    static countWords2(text: string, locale: string = 'en'): number {
-        if (!text) {
-            return 0;
-        }
-        const plain = this.cleanMarkdown(text);
-
-        const segmenter = new Intl.Segmenter(locale, { granularity: 'word' });
-        const words = [...segmenter.segment(plain)].filter(w => w.isWordLike);
-        return words.length;
-    }
-
     static countWords(text: string, locale: string = 'en'): number {
         if (!text?.trim()) {
             return 0;
@@ -137,18 +143,6 @@ return content.replace(/^---\r?\n[\s\S]*?\n---\r?\n/m, ''); // remove YAML front
         }
     }
 
-    static getSentences2(text: string, locale: string = 'en'): string[] {
-        if (!text) {
-            return [];
-        }
-
-        const segmenter = new Intl.Segmenter(locale, { 
-            granularity: 'sentence' 
-        });
-        const segmentsIterator = segmenter.segment(text);
-        const sentences = Array.from(segmentsIterator).map(item => item.segment);
-        return sentences.filter(s => s.trim().length > 0);
-    }
     static getSentences(text: string, locale: string = 'en', cleanMd: boolean = true): string[] {
         if (!text?.trim()) {
             return [];
@@ -174,12 +168,6 @@ return content.replace(/^---\r?\n[\s\S]*?\n---\r?\n/m, ''); // remove YAML front
         }
     }
 
-    static countLongWords2(text: string): number {
-        const cleanText = this.cleanMarkdown(text);
-        const words = cleanText.split(/\s+/); // split by whitespace
-        return words.filter(w => w.length > 6).length;
-    }
-
     static countLongWords(text: string, minLength: number = 6, locale: string = 'en'): number {
         if (!text?.trim() || minLength < 1) {
             return 0;
@@ -198,16 +186,6 @@ return content.replace(/^---\r?\n[\s\S]*?\n---\r?\n/m, ''); // remove YAML front
                 .filter(w => w.length > minLength && /\w/.test(w))
                 .length;
         }
-    }
-
-    static getTags2(content: string): string[] {
-        const regex = /#([a-zA-Zа-яА-ЯёЁ0-9_\-\/]+)/g;
-        const matches: string[] = [];
-        let match;
-        while ((match = regex.exec(content)) !== null) {
-            matches.push(match[1] ?? "");
-        }
-        return matches;
     }
 
     static getTags(content: string, unique: boolean = true): string[] {
