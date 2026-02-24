@@ -1,21 +1,4 @@
-declare namespace Intl {
-    interface SegmenterOptions {
-        granularity?: 'grapheme' | 'word' | 'sentence';
-        localeMatcher?: 'best fit' | 'lookup';
-    }
-
-    interface SegmenterSegment {
-        segment: string;
-        index: number;
-        input: string;
-        isWordLike?: boolean;
-    }
-
-    class Segmenter {
-        constructor(locale?: string, options?: SegmenterOptions);
-        segment(input: string): IterableIterator<SegmenterSegment>;
-    }
-}
+import { MetricRange, PluginSettings, QualityScoreConfig } from "settings";
 
 export interface Metric {
     id: string;
@@ -65,7 +48,9 @@ export class TextUtils {
             if (headingIndex !== -1) {
                 if (headingIndex > 0) {
                     const beforeHeading = lines.slice(0, headingIndex).join(' ').trim();
-                    beforeHeading && paragraphs.push(beforeHeading);
+                    if (beforeHeading) {
+                        paragraphs.push(beforeHeading);
+                    }
                 }
                 
                 const headingText = lines[headingIndex]?.replace(/^#+\s*/, '').trim();
@@ -79,7 +64,9 @@ export class TextUtils {
                     paragraphs.push(`${headingText} ${nextBlock}`);
                     i += 2;
                 } else {
-                    headingText && paragraphs.push(headingText);
+                    if(headingText) {
+                        paragraphs.push(headingText);
+                    } 
                     i++;
                 }
             } else {
@@ -91,10 +78,14 @@ export class TextUtils {
         for (let i = 0; i < paragraphs.length; i++) {
             if (paragraphs[i]?.contains('#')) {
                 const splitedParagraph = paragraphs[i]?.replace(/#+/g, '#').trim().split('#');
-                splitedParagraph && newParagraphs.push(...splitedParagraph);
+                if (splitedParagraph) {
+                    newParagraphs.push(...splitedParagraph);
+                }
             }
             else {
-                paragraphs[i] && newParagraphs.push(paragraphs[i]!);
+                if (paragraphs[i]) {
+                    newParagraphs.push(paragraphs[i]!);
+                }
             }
         }
 
@@ -106,10 +97,10 @@ export class TextUtils {
             .replace(/```[\s\S]*?```/g, '') // remove fenced code blocks (``` ... ```)
             .replace(/`[^`]+`/g, '') // remove inline code (`code`)
             .replace(/<!--[\s\S]*?-->/g, '') // remove HTML comments
-            .replace(/!\[([^\]]*)\]\([^\)]+\)/g, '$1') // replace images with alt text
-            .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1') // replace inline links with text only
+            .replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1') // replace images with alt text
+            .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // replace inline links with text only
             .replace(/\[([^\]]+)\]\[[^\]]+\]/g, '$1') // replace reference links with text only
-            .replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_, link, display) => display || link) // handle wiki links [[link|text]]
+            .replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_: string, link: string, display: string) => display || link) // handle wiki links [[link|text]]
             .replace(/^#{1,6}\s+/gm, '') // remove header markers (#, ##, etc.)
             .replace(/^>\s+/gm, '') // remove blockquote markers (>)
             .replace(/^[-*_]{3,}\s*$/gm, '') // remove horizontal rules (---, ***, ___)
@@ -193,7 +184,7 @@ export class TextUtils {
             return [];
         }
         
-        const regex = /#([\p{L}\p{N}_\-\/]+)/gu; // match hashtags with Unicode letters, numbers, _, -, /
+        const regex = /#([\p{L}\p{N}_/ -]+)/gu; // match hashtags with Unicode letters, numbers, _, -, /
         const matches: string[] = [];
         let match;
         
@@ -217,13 +208,13 @@ export class TextUtils {
     static getExternalLinks(content: string): string[] {
         const links: string[] = [];
         
-        const markdownRegex = /\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g; // match markdown links [text](http://...)
+        const markdownRegex = /\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g; // match markdown links [text](http://...)
         let match;
         while ((match = markdownRegex.exec(content)) !== null) {
             links.push(match[2] ?? "");
         }
         
-        const urlRegex = /(?<!\]\()https?:\/\/[^\s\)]+/g; // match URLs not part of markdown links
+        const urlRegex = /(?<!\]\()https?:\/\/[^\s)]+/g; // match URLs not part of markdown links
         while ((match = urlRegex.exec(content)) !== null) {
             links.push(match[0]);
         }
@@ -242,18 +233,18 @@ export class TextUtils {
 
 export class MetricsRegistry {
     private metrics: Map<string, AnyMetric> = new Map();
-    private qualityScoreConfig: any = null; 
-    private pluginSettings: any = null;
+    private qualityScoreConfig: QualityScoreConfig | null = null; 
+    private pluginSettings: PluginSettings | null = null;
 
     constructor() {
         this.registerAllMetrics();
     }
 
-    updateQualityScoreConfig(config: any): void {
+    updateQualityScoreConfig(config: QualityScoreConfig | null): void {
         this.qualityScoreConfig = config;
     }
 
-    setPluginSettings(settings: any): void {
+    setPluginSettings(settings: PluginSettings | null): void {
         this.pluginSettings = settings;
     }
 
@@ -307,7 +298,7 @@ export class MetricsRegistry {
         const results: Record<string, number> = {};
         
         const baseMetrics = enabledMetrics.filter(m => !isCompositeMetric(m)) as Metric[];
-        const compositeMetrics = enabledMetrics.filter(m => isCompositeMetric(m)) as CompositeMetric[];
+        const compositeMetrics = enabledMetrics.filter(m => isCompositeMetric(m));
         
         for (const metric of baseMetrics) {
             try {
@@ -510,7 +501,7 @@ export class MetricsRegistry {
                     return 0;
                 }
 
-                const { weights, ranges } = this.qualityScoreConfig;
+                //const { weights, ranges } = this.qualityScoreConfig;
                 const enabledMetrics = this.getEnabledMetricsForQuality();
 
                 if (enabledMetrics.length === 0) {
@@ -518,7 +509,7 @@ export class MetricsRegistry {
                     return 0;
                 }
 
-                const normalize = (value: number, range: any): number => {
+                const normalize = (value: number, range: MetricRange): number => {
                     const { min, optimal_min, optimal_max, max } = range;
 
                     if (value >= optimal_min && value <= optimal_max) {
@@ -548,8 +539,14 @@ export class MetricsRegistry {
                         continue;
                     }
 
-                    const range = ranges[metricId];
-                    const weight = weights[metricId];
+                    //const range = ranges[metricId];
+                    //const weight = weights[metricId];
+                    
+                    const rangeKeyTyped = metricId as keyof QualityScoreConfig['ranges'];
+                    const range = this.qualityScoreConfig.ranges[rangeKeyTyped];
+
+                    const weightKeyTyped = metricId as keyof QualityScoreConfig['weights'];
+                    const weight = this.qualityScoreConfig.weights[weightKeyTyped];
 
                     if (range && weight !== undefined) {
                         const normalizedScore = normalize(value, range);
@@ -567,7 +564,8 @@ export class MetricsRegistry {
                 for (const metricId of enabledMetrics) {
                     if (scores[metricId] !== undefined) {
                         const score = scores[metricId];
-                        const weight = weights[metricId];
+                        const weightKeyTyped = metricId as keyof QualityScoreConfig['weights'];
+                        const weight = this.qualityScoreConfig.weights[weightKeyTyped];
                         const contribution = score * weight;
                         weightedSum += contribution;
                     }

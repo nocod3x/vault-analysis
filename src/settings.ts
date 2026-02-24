@@ -1,5 +1,6 @@
 import { App, PluginSettingTab, Setting } from 'obsidian';
 import AverageParagraphLengthPlugin from './main';
+import { AnyMetric } from './metrics';
 
 export interface MetricRange {
     min: number;
@@ -106,12 +107,14 @@ export class SettingTab extends PluginSettingTab {
         const { containerEl } = this;
 
         containerEl.empty();
-		containerEl.createEl('h2', { 
-			text: 'Metric Settings', 
+		/*containerEl.createEl('h2', { 
+			text: 'Metric settings', 
 			cls: 'settings-header'
-		});
+		});*/
+        new Setting(containerEl).setName('Metric').setHeading();
+
         containerEl.createEl('p', { 
-            text: 'Select metrics to enable or disable them. Disabled metrics will not be calculated or included in the Quality Score calculation.',
+            text: 'Select metrics to enable or disable them. Disabled metrics will not be calculated or included in the quality score calculation.',
 			cls: 'settings-small-text'
         });
 
@@ -126,7 +129,7 @@ export class SettingTab extends PluginSettingTab {
         for (const category of categories) {
             //containerEl.createEl('h3', { text: category.name });
             
-            const metrics = this.plugin.metricsRegistry.getByCategory(category.id as any);
+            const metrics: AnyMetric[] = this.plugin.metricsRegistry.getByCategory(category.id);
             
             for (const metric of metrics) {
                 new Setting(containerEl)
@@ -165,14 +168,15 @@ export class SettingTab extends PluginSettingTab {
 
         if (enabledForQuality.length === 0) {
             const warningEl = containerEl.createEl('div', { cls: 'mod-warning' });
-            warningEl.createEl('strong', { text: '⚠️ Warning: ' });
+            warningEl.createEl('strong', { text: '⚠️ warning: ' });
             warningEl.appendText('No metrics are enabled for Quality Score calculation. Enable at least one metric above (avg_paragraph_length, lix, question_coefficient, exclamation_coefficient, internal_link_density, or external_link_density).');
         }
 
-        containerEl.createEl('h2', { 
-			text: 'Metric Weights for Custom Quality Score Metric',
+        /*containerEl.createEl('h2', { 
+			text: 'Metric weights for custom quality score metric',
 			cls: 'settings-header'
-		});
+		});*/
+        new Setting(containerEl).setName('Metric weights for custom quality score metric').setHeading();
 
         containerEl.createEl('p', {
             text: 'Weights are automatically normalized based on enabled metrics. You can set any values - they will be scaled proportionally.',
@@ -197,10 +201,12 @@ export class SettingTab extends PluginSettingTab {
             cls: 'setting-item-description'
         });
         
-        containerEl.createEl('h2', { 
-			text: 'Optimal Ranges for Custom Quality Score Metric',
+        /*containerEl.createEl('h2', { 
+			text: 'Optimal ranges for custom quality score metric',
 			cls: 'settings-header'
-		});
+		});*/
+        new Setting(containerEl).setName('Optimal ranges for custom quality score metric').setHeading();
+
         containerEl.createEl('p', {
             text: 'Define what values are considered optimal for each metric. Values outside the optimal range will be penalized.',
 			cls: 'settings-small-text'
@@ -213,10 +219,12 @@ export class SettingTab extends PluginSettingTab {
         this.addRangeSetting(containerEl, 'internal_link_density', 'Internal Link Density', '%');
         this.addRangeSetting(containerEl, 'external_link_density', 'External Link Density', '%');
 
-		containerEl.createEl('h2', { 
-			text: 'Other Settings',
+		/*containerEl.createEl('h2', { 
+			text: 'Other settings',
 			cls: 'settings-header'
-		});
+		});*/
+        new Setting(containerEl).setName('Other').setHeading();
+
         containerEl.createEl('p', {
             text: 'Other miscellaneous settings for the plugin.',
 			cls: 'settings-small-text'
@@ -239,7 +247,8 @@ export class SettingTab extends PluginSettingTab {
                 .setButtonText('Reset')
                 .setCta()
                 .onClick(async () => {
-                    this.plugin.settings = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
+                    const defaultSettingsString: string = JSON.stringify(DEFAULT_SETTINGS);
+                    this.plugin.settings = JSON.parse(defaultSettingsString) as PluginSettings;
                     await this.plugin.saveSettings();
                     
                     this.plugin.metricsRegistry.updateQualityScoreConfig(this.plugin.settings.qualityScoreConfig);
@@ -249,7 +258,7 @@ export class SettingTab extends PluginSettingTab {
                 }));
 
         new Setting(this.containerEl)
-			.setName("Delete selected Plugin YAML Tags")
+			.setName("Delete selected plugin YAML tags")
 			.setDesc("Removes selected plugin-related YAML keys from all notes")
 			.addButton(btn =>
 				btn
@@ -261,7 +270,7 @@ export class SettingTab extends PluginSettingTab {
 			);
 
         new Setting(this.containerEl)
-			.setName("Delete all Plugin YAML Tags")
+			.setName("Delete all plugin YAML tags")
 			.setDesc("Removes all plugin-related YAML keys from all notes")
 			.addButton(btn =>
 				btn
@@ -276,7 +285,7 @@ export class SettingTab extends PluginSettingTab {
     private calculateWeightSum(enabledForQuality: string[]): number {
         return Object.entries(this.plugin.settings.qualityScoreConfig.weights)
             .filter(([key]) => enabledForQuality.includes(key))
-            .reduce((sum, [, weight]) => sum + (weight as number), 0);
+            .reduce((sum, [, weight]) => sum + (weight), 0);
     }
 
     private addWeightSetting(containerEl: HTMLElement, metricId: string, displayName: string, enabledMetrics: string[]) {
@@ -326,21 +335,22 @@ export class SettingTab extends PluginSettingTab {
         const rangeContainer = settingEl.controlEl.createDiv({ cls: 'metric-range-settings' });
 
         // Optimal Min
-        rangeContainer.createEl('label', { text: 'Optimal Min: ' });
+        rangeContainer.createEl('label', { text: 'Optimal min: ' });
         const minInput = rangeContainer.createEl('input', {
             type: 'number',
             value: range.optimal_min.toString()
         });
-        minInput.style.width = '60px';
-        minInput.style.marginRight = '10px';
-        
+        // minInput.style.width = '60px';
+        minInput.setCssProps({ width: '60px', marginRight: '10px' });
+        // minInput.style.marginRight = '10px';
         // Optimal Max
-        rangeContainer.createEl('label', { text: 'Optimal Max: ' });
+        rangeContainer.createEl('label', { text: 'Optimal max: ' });
         const maxInput = rangeContainer.createEl('input', {
             type: 'number',
             value: range.optimal_max.toString()
         });
-        maxInput.style.width = '60px';
+        maxInput.setCssProps({ width: '60px' });
+        // maxInput.style.width = '60px';
 
         const updateRange = async () => {
             const newMin = parseFloat(minInput.value);
@@ -354,7 +364,7 @@ export class SettingTab extends PluginSettingTab {
             }
         };
 
-        minInput.addEventListener('blur', updateRange);
-        maxInput.addEventListener('blur', updateRange);
+        minInput.addEventListener('blur', () => void updateRange);
+        maxInput.addEventListener('blur', () => void updateRange);
     }
 }

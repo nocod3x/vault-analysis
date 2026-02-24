@@ -1,7 +1,7 @@
-import { App, Plugin, TFile, Notice } from 'obsidian';
+import { Plugin, TFile, Notice } from 'obsidian';
 import { PluginSettings, DEFAULT_SETTINGS, SettingTab } from './settings';
-import { MetricsRegistry, Metric } from './metrics';
-import yaml from "js-yaml";
+import { AnyMetric, MetricsRegistry } from './metrics';
+import { parse, stringify } from "yaml";
 
 export default class AverageParagraphLengthPlugin extends Plugin {
     settings: PluginSettings;
@@ -22,7 +22,7 @@ export default class AverageParagraphLengthPlugin extends Plugin {
 
         this.addSettingTab(new SettingTab(this.app, this));
 
-        this.addRibbonIcon('calculator', 'Calculate Note Metrics', async () => {
+        this.addRibbonIcon('calculator', 'Calculate note metrics', async () => {
             await this.calculateMetricsForAllNotes();
         });
 
@@ -47,8 +47,9 @@ export default class AverageParagraphLengthPlugin extends Plugin {
 		});
     }
 
-    async loadSettings() {
-        this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    async loadSettings() { 
+        const data = (await this.loadData()) as Partial<PluginSettings>; 
+        this.settings = Object.assign({}, DEFAULT_SETTINGS, data || {}); 
     }
 
     async saveSettings() {
@@ -75,12 +76,12 @@ export default class AverageParagraphLengthPlugin extends Plugin {
 			const match = content.match(/^---\n([\s\S]*?)\n---/);
 			if (!match) continue;
 
-			let data: any;
-			try {
-				data = yaml.load(match[1] ?? "");
-			} catch {
-				continue;
-			}
+            let data: Record<string, number>;
+            try {
+                data = parse(match[1] ?? "") as Record<string, number>;
+            } catch {
+                continue;
+            }
 
 			if (!data || typeof data !== "object") continue;
 
@@ -95,7 +96,7 @@ export default class AverageParagraphLengthPlugin extends Plugin {
 			if (!changed) continue;
 
 			const newYaml = Object.keys(data).length
-				? `---\n${yaml.dump(data).trim()}\n---`
+				? `---\n${stringify(data).trim()}\n---`
 				: "";
 
 			const newContent = newYaml + content.slice(match[0].length + (newYaml.length > 0 ? 0 : 1));
@@ -133,7 +134,7 @@ export default class AverageParagraphLengthPlugin extends Plugin {
         new Notice(`Completed! Processed: ${processedCount}, Errors: ${errorCount}`);
     }
 
-    async processFile(file: TFile, metrics: any[]) {
+    async processFile(file: TFile, metrics: AnyMetric[]) {
         const content = await this.app.vault.read(file);
         
         const results = this.metricsRegistry.calculateAll(content, metrics);
@@ -141,7 +142,7 @@ export default class AverageParagraphLengthPlugin extends Plugin {
     }
 
     async updateFrontmatter(file: TFile, metrics: Record<string, number>) {
-        await this.app.fileManager.processFrontMatter(file, (frontmatter) => {
+        await this.app.fileManager.processFrontMatter(file, (frontmatter: Record<string, number>) => {
             for (const [key, value] of Object.entries(metrics)) {
                 frontmatter[key] = value;
             }
