@@ -3,9 +3,8 @@
 	"name": "Vault Analysis",
 	"version": "1.0.0",
 	"minAppVersion": "0.15.0",
-	"description": "Vault Analysis plugin for Obsidian",
-	"author": "Obsidian",
+	"description": "Vault analysis plugin for Obsidian",
+	"author": "nocod3x",
 	"authorUrl": "https://obsidian.md",
-	"fundingUrl": "https://obsidian.md/pricing",
 	"isDesktopOnly": false
 }
