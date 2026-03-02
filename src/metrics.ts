@@ -248,7 +248,7 @@ export class MetricsRegistry {
         this.pluginSettings = settings;
     }
 
-    private getEnabledMetricsForQuality(): string[] {
+    getEnabledMetricsForQuality(): string[] {
         if (!this.pluginSettings) {
             return [];
         }
@@ -333,10 +333,6 @@ export class MetricsRegistry {
         return results;
     }
 
-        getEnabledMetricsForQualityUI(): string[] {
-        return this.getEnabledMetricsForQuality();
-    }
-
     private registerAllMetrics(): void {
         
         // ============================================
@@ -382,10 +378,10 @@ export class MetricsRegistry {
                 const sentences = TextUtils.getSentences(withoutFrontmatter, currentLocale);
                 const totalWords = TextUtils.countWords(withoutFrontmatter);
                 const longWords = TextUtils.countLongWords(withoutFrontmatter);
-
                 if (sentences.length === 0 || totalWords === 0) return 0;
 
                 const lix = (totalWords / sentences.length) + (longWords * 100 / totalWords);
+                // console.log(Math.round(lix * 100) / 100, sentences, totalWords, longWords);
                 return Math.round(lix * 100) / 100;
             }
         });
@@ -441,7 +437,7 @@ export class MetricsRegistry {
         this.register({
             id: 'internal_link_density',
             name: 'Internal Link Density',
-            description: 'Internal links per 100 words',
+            description: 'Internal links density',
             frontmatterKey: 'internal_link_density',
             category: 'graph',
             enabled: true,
@@ -460,7 +456,7 @@ export class MetricsRegistry {
         this.register({
             id: 'external_link_density',
             name: 'External Link Density',
-            description: 'External links per 100 words',
+            description: 'External links density',
             frontmatterKey: 'external_link_density',
             category: 'graph',
             enabled: true,
@@ -472,6 +468,8 @@ export class MetricsRegistry {
                 if (totalWords === 0) return 0;
 
                 const density = (externalLinks.length / totalWords) * 100;
+                
+                // console.log(Math.round(density * 100) / 100, totalWords);
                 return Math.round(density * 100) / 100;
             }
         });

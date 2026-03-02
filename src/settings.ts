@@ -111,7 +111,7 @@ export class SettingTab extends PluginSettingTab {
 			text: 'Metric settings', 
 			cls: 'settings-header'
 		});*/
-        new Setting(containerEl).setName('Metric').setHeading();
+        new Setting(containerEl).setName('Metrics').setHeading();
 
         containerEl.createEl('p', { 
             text: 'Select metrics to enable or disable them. Disabled metrics will not be calculated or included in the quality score calculation.',
@@ -150,6 +150,7 @@ export class SettingTab extends PluginSettingTab {
                             }
                             
                             await this.plugin.saveSettings();
+                            this.display();
                         }));
             }
         }
@@ -159,14 +160,15 @@ export class SettingTab extends PluginSettingTab {
 		// 	cls: 'settings-header'
 		// });
         
-        const enabledForQuality = this.plugin.metricsRegistry.getEnabledMetricsForQualityUI();
+        const enabledForQuality = this.plugin.metricsRegistry.getEnabledMetricsForQuality();
+        const isCustomQualityScoreEnabled = this.plugin.metricsRegistry.getEnabled().filter(metric => metric.id === 'custom_quality_score').length > 0;
 
         // containerEl.createEl('p', {
         //     text: 'Configure weights and optimal ranges for the quality score calculation. Weights must sum to 1.0 (100%).',
 		// 	cls: 'settings-small-text'
         // });
 
-        if (enabledForQuality.length === 0) {
+        if (enabledForQuality.length === 0 && isCustomQualityScoreEnabled) {
             const warningEl = containerEl.createEl('div', { cls: 'mod-warning' });
             warningEl.createEl('strong', { text: '⚠️ warning: ' });
             warningEl.appendText('No metrics are enabled for Quality Score calculation. Enable at least one metric above (avg_paragraph_length, lix, question_coefficient, exclamation_coefficient, internal_link_density, or external_link_density).');
@@ -176,6 +178,7 @@ export class SettingTab extends PluginSettingTab {
 			text: 'Metric weights for custom quality score metric',
 			cls: 'settings-header'
 		});*/
+        
         new Setting(containerEl).setName('Metric weights for custom quality score metric').setHeading();
 
         containerEl.createEl('p', {
