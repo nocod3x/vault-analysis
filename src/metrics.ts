@@ -14,7 +14,7 @@ export interface CompositeMetric extends Omit<Metric, 'calculate'> {
     dependencies: string[]; // metrics ids
     calculateFromMetrics: (metrics: Record<string, number>) => number;
 }
-
+ 
 export type AnyMetric = Metric | CompositeMetric;
 
 export function isCompositeMetric(metric: AnyMetric): metric is CompositeMetric {
@@ -26,71 +26,85 @@ export class TextUtils {
         return content.replace(/^---\r?\n[\s\S]*?\n---\r?\n/m, ''); // remove YAML frontmatter wrapped in --- (supports Windows and Unix line endings)
     }
 
-    //test dirty variant 
     static getParagraphs(content: string): string[] {
         const withoutFrontmatter = this.removeFrontmatter(content);
-        const normalized = withoutFrontmatter.replace(/\r\n/g, '\n');
-        
-        const blocks: string[] = normalized
-            .split(/\n\s*\n/)
-            .map(b => b.trim())
-            .filter(b => b.length > 0);
-        
-        const paragraphs: string[] = [];
-        let i = 0;
-        
-        while (i < blocks.length) {
-            const block: string = blocks[i] ?? "";
-            
-            const lines: string[] = block.split('\n');
-            const headingIndex = lines.findIndex((line: string) => line.trim().startsWith('#'));
-            
-            if (headingIndex !== -1) {
-                if (headingIndex > 0) {
-                    const beforeHeading = lines.slice(0, headingIndex).join(' ').trim();
-                    if (beforeHeading) {
-                        paragraphs.push(beforeHeading);
-                    }
-                }
-                
-                const headingText = lines[headingIndex]?.replace(/^#+\s*/, '').trim();
-                const afterHeading = lines.slice(headingIndex + 1).join(' ').trim();
-                
-                if (afterHeading) {
-                    paragraphs.push(`${headingText} ${afterHeading}`);
-                    i++;
-                } else if (i + 1 < blocks.length && !blocks[i + 1]?.trim().startsWith('#')) {
-                    const nextBlock = blocks[i + 1]?.replace(/\n/g, ' ').trim();
-                    paragraphs.push(`${headingText} ${nextBlock}`);
-                    i += 2;
-                } else {
-                    if(headingText) {
-                        paragraphs.push(headingText);
-                    } 
-                    i++;
-                }
-            } else {
-                paragraphs.push(block.replace(/\n/g, ' ').trim());
-                i++;
-            }
-        }
-        let newParagraphs: string[] = [];
-        for (let i = 0; i < paragraphs.length; i++) {
-            if (paragraphs[i]?.contains('#')) {
-                const splitedParagraph = paragraphs[i]?.replace(/#+/g, '#').trim().split('#');
-                if (splitedParagraph) {
-                    newParagraphs.push(...splitedParagraph);
-                }
-            }
-            else {
-                if (paragraphs[i]) {
-                    newParagraphs.push(paragraphs[i]!);
-                }
-            }
-        }
-
-        return newParagraphs;
+        const blocks: string[] = withoutFrontmatter.replace(/(\r?\n){3,}/g, '\n\n').split("\n\n").filter(Boolean);
+        return blocks;
     }
+
+    static getChapters(content: string): string[] {
+        const withoutFrontmatter = this.removeFrontmatter(content);
+        const blocks: string[] = withoutFrontmatter.replace(/#{2,}/g, '#').split('#').filter(Boolean);
+        return blocks;
+    }
+    //test dirty variant 
+    // static getParagraphs(content: string): string[] {
+    //     const test = this.getParagraphs2(content);
+    //     console.log(content, test, test.length);
+
+    //     const withoutFrontmatter = this.removeFrontmatter(content);
+    //     const normalized = withoutFrontmatter.replace(/\r\n/g, '\n');
+        
+    //     const blocks: string[] = normalized
+    //         .split(/\n\s*\n/)
+    //         .map(b => b.trim())
+    //         .filter(b => b.length > 0);
+        
+    //     const paragraphs: string[] = [];
+    //     let i = 0;
+        
+    //     while (i < blocks.length) {
+    //         const block: string = blocks[i] ?? "";
+            
+    //         const lines: string[] = block.split('\n');
+    //         const headingIndex = lines.findIndex((line: string) => line.trim().startsWith('#'));
+            
+    //         if (headingIndex !== -1) {
+    //             if (headingIndex > 0) {
+    //                 const beforeHeading = lines.slice(0, headingIndex).join(' ').trim();
+    //                 if (beforeHeading) {
+    //                     paragraphs.push(beforeHeading);
+    //                 }
+    //             }
+                
+    //             const headingText = lines[headingIndex]?.replace(/^#+\s*/, '').trim();
+    //             const afterHeading = lines.slice(headingIndex + 1).join(' ').trim();
+                
+    //             if (afterHeading) {
+    //                 paragraphs.push(`${headingText} ${afterHeading}`);
+    //                 i++;
+    //             } else if (i + 1 < blocks.length && !blocks[i + 1]?.trim().startsWith('#')) {
+    //                 const nextBlock = blocks[i + 1]?.replace(/\n/g, ' ').trim();
+    //                 paragraphs.push(`${headingText} ${nextBlock}`);
+    //                 i += 2;
+    //             } else {
+    //                 if(headingText) {
+    //                     paragraphs.push(headingText);
+    //                 } 
+    //                 i++;
+    //             }
+    //         } else {
+    //             paragraphs.push(block.replace(/\n/g, ' ').trim());
+    //             i++;
+    //         }
+    //     }
+    //     let newParagraphs: string[] = [];
+    //     for (let i = 0; i < paragraphs.length; i++) {
+    //         if (paragraphs[i]?.contains('#')) {
+    //             const splitedParagraph = paragraphs[i]?.replace(/#+/g, '#').trim().split('#');
+    //             if (splitedParagraph) {
+    //                 newParagraphs.push(...splitedParagraph);
+    //             }
+    //         }
+    //         else {
+    //             if (paragraphs[i]) {
+    //                 newParagraphs.push(paragraphs[i]!);
+    //             }
+    //         }
+    //     }
+
+    //     return newParagraphs;
+    // }
 
     static cleanMarkdown(text: string): string {
         return text
@@ -205,6 +219,25 @@ export class TextUtils {
         return matches;
     }
 
+    static getInternalDeadLinks(
+        content: string,
+        sourcePath: string,
+        metadataCache: { getFirstLinkpathDest(linkpath: string, sourcePath: string): { path: string } | null }
+    ): string[] {
+        const links = this.getInternalLinks(content);
+
+        return links
+            .map(raw => {
+                const withoutAlias = raw.split('|')[0] ?? raw;
+                const linkpath = withoutAlias.split('#')[0]?.trim() ?? withoutAlias.trim();
+                return linkpath;
+            })
+            .filter(linkpath => {
+                if (!linkpath) return false;
+                return metadataCache.getFirstLinkpathDest(linkpath, sourcePath) === null;
+            });
+    }
+
     static getExternalLinks(content: string): string[] {
         const links: string[] = [];
         
@@ -255,10 +288,12 @@ export class MetricsRegistry {
 
         const availableMetrics = [
             'avg_paragraph_length',
+            'avg_chapter_length',
             'lix',
             'question_coefficient',
             'exclamation_coefficient',
             'internal_link_density',
+            'internal_dead_link_density',
             'external_link_density'
         ];
         
@@ -361,6 +396,28 @@ export class MetricsRegistry {
             }
         });
 
+        this.register({
+            id: 'avg_chapter_length',
+            name: 'Average Chapter Length',
+            description: 'Average number of words per chapter',
+            frontmatterKey: 'avg_chapter_length',
+            category: 'structure',
+            enabled: true,
+            calculate: (content: string): number => {
+                const chapters = TextUtils.getChapters(content);
+                
+                if (chapters.length === 0) return 0;
+
+                let totalWords = 0;
+                for (const chapter of chapters) {
+                    totalWords += TextUtils.countWords(chapter);
+                }
+
+                const avgLength = totalWords / chapters.length;
+                return Math.round(avgLength * 100) / 100;
+            }
+        });
+
         // ============================================
         // 2. Syntax
         // ============================================
@@ -454,6 +511,27 @@ export class MetricsRegistry {
         });
 
         this.register({
+            id: 'internal_dead_link_density',
+            name: 'Internal Dead Link Density',
+            description: 'Density of internal dead links',
+            frontmatterKey: 'internal_dead_link_density',
+            category: 'graph',
+            enabled: true,
+            calculate: (content: string, sourcePath: string = ''): number => {
+                const metadataCache = (globalThis as any).app?.metadataCache;
+                if (!metadataCache) return 0;
+
+                const internalDeadLinks = TextUtils.getInternalDeadLinks(content, sourcePath, metadataCache).length;
+                const internalLinks = TextUtils.getInternalLinks(content).length;
+
+                if (internalLinks === 0) return 0;
+
+                const density = (internalDeadLinks / internalLinks) * 100;
+                return Math.round(density * 100) / 100;
+            }
+        });
+
+        this.register({
             id: 'external_link_density',
             name: 'External Link Density',
             description: 'External links density',
@@ -487,6 +565,7 @@ export class MetricsRegistry {
             enabled: false,
             dependencies: [
                 'avg_paragraph_length',
+                'avg_chapter_length',
                 'lix',
                 'question_coefficient',
                 'exclamation_coefficient',

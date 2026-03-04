@@ -9,7 +9,6 @@ export default class AverageParagraphLengthPlugin extends Plugin {
 
     async onload() {
         //console.log('Loading Note Metrics Plugin');
-
         this.metricsRegistry = new MetricsRegistry();
 
         await this.loadSettings();
@@ -22,9 +21,9 @@ export default class AverageParagraphLengthPlugin extends Plugin {
 
         this.addSettingTab(new SettingTab(this.app, this));
 
-        this.addRibbonIcon('calculator', 'Calculate note metrics', async () => {
+        /*this.addRibbonIcon('calculator', 'Calculate note metrics', async () => {
             await this.calculateMetricsForAllNotes();
-        });
+        });*/
 
         this.addCommand({
             id: 'calculate-all-metrics',
@@ -133,7 +132,7 @@ export default class AverageParagraphLengthPlugin extends Plugin {
 
         new Notice(`Completed! Processed: ${processedCount}, Errors: ${errorCount}`);
     }
-
+ 
     async processFile(file: TFile, metrics: AnyMetric[]) {
         const content = await this.app.vault.read(file);
         

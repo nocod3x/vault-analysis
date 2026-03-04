@@ -12,18 +12,22 @@ export interface MetricRange {
 export interface QualityScoreConfig {
     weights: {
         avg_paragraph_length: number;
+        avg_chapter_length: number;
         lix: number;
         question_coefficient: number;
         exclamation_coefficient: number;
         internal_link_density: number;
+        internal_dead_link_density: number;
         external_link_density: number;
     };
     ranges: {
         avg_paragraph_length: MetricRange;
+        avg_chapter_length: MetricRange;
         lix: MetricRange;
         question_coefficient: MetricRange;
         exclamation_coefficient: MetricRange;
         internal_link_density: MetricRange;
+        internal_dead_link_density: MetricRange;
         external_link_density: MetricRange;
     };
 }
@@ -36,21 +40,25 @@ export interface PluginSettings {
 export const DEFAULT_SETTINGS: PluginSettings = {
     enabledMetrics: [
         'avg_paragraph_length',
+        'avg_chapter_length',
         'lix',
         'question_coefficient',
         'exclamation_coefficient',
         'internal_link_density',
+        'internal_dead_link_density',
         'external_link_density',
         'custom_quality_score'
     ], // by default all metrics are enabled
     qualityScoreConfig: {
         weights: {
-            avg_paragraph_length: 0.20,
+            avg_paragraph_length: 0.1,
+            avg_chapter_length: 0.1,
             lix: 0.20,
             question_coefficient: 0.15,
             exclamation_coefficient: 0.15,
-            internal_link_density: 0.15,
-            external_link_density: 0.15
+            internal_link_density: 0.10,
+            internal_dead_link_density: 0.10,
+            external_link_density: 0.10
         },
         ranges: {
             avg_paragraph_length: {
@@ -59,35 +67,47 @@ export const DEFAULT_SETTINGS: PluginSettings = {
                 optimal_max: 60,
                 max: 150
             },
+            avg_chapter_length: {
+                min: 0,
+                optimal_min: 90,
+                optimal_max: 120,
+                max: 200
+            },
             lix: {
                 min: 0,
                 optimal_min: 30,
                 optimal_max: 40,
-                max: 80
+                max: 90
             },
             question_coefficient: {
                 min: 0,
                 optimal_min: 0,
                 optimal_max: 15,
-                max: 50
+                max: 100
             },
             exclamation_coefficient: {
                 min: 0,
                 optimal_min: 0,
                 optimal_max: 5,
-                max: 30
+                max: 100
             },
             internal_link_density: {
                 min: 0,
                 optimal_min: 1,
                 optimal_max: 5,
-                max: 20
+                max: 100
+            },
+            internal_dead_link_density: {
+                min: 0,
+                optimal_min: 0,
+                optimal_max: 0.5,
+                max: 100
             },
             external_link_density: {
                 min: 0,
                 optimal_min: 0.5,
                 optimal_max: 3,
-                max: 10
+                max: 100
             }
         }
     }
@@ -101,7 +121,7 @@ export class SettingTab extends PluginSettingTab {
     constructor(app: App, plugin: AverageParagraphLengthPlugin) {
         super(app, plugin);
         this.plugin = plugin;
-    }
+    } 
 
     display(): void {
         const { containerEl } = this;
@@ -171,7 +191,7 @@ export class SettingTab extends PluginSettingTab {
         if (enabledForQuality.length === 0 && isCustomQualityScoreEnabled) {
             const warningEl = containerEl.createEl('div', { cls: 'mod-warning' });
             warningEl.createEl('strong', { text: '⚠️ warning: ' });
-            warningEl.appendText('No metrics are enabled for Quality Score calculation. Enable at least one metric above (avg_paragraph_length, lix, question_coefficient, exclamation_coefficient, internal_link_density, or external_link_density).');
+            warningEl.appendText('No metrics are enabled for Quality Score calculation. Enable at least one metric above (avg_paragraph_length, avg_chapter_length, lix, question_coefficient, exclamation_coefficient, internal_link_density, or external_link_density).');
         }
 
         /*containerEl.createEl('h2', { 
@@ -187,10 +207,12 @@ export class SettingTab extends PluginSettingTab {
         });
         
         this.addWeightSetting(containerEl, 'avg_paragraph_length', 'Average Paragraph Length', enabledForQuality);
+        this.addWeightSetting(containerEl, 'avg_chapter_length', 'Average Chapter Length', enabledForQuality);
         this.addWeightSetting(containerEl, 'lix', 'LIX (Readability)', enabledForQuality);
         this.addWeightSetting(containerEl, 'question_coefficient', 'Question Coefficient', enabledForQuality);
         this.addWeightSetting(containerEl, 'exclamation_coefficient', 'Exclamation Coefficient', enabledForQuality);
         this.addWeightSetting(containerEl, 'internal_link_density', 'Internal Link Density', enabledForQuality);
+        this.addWeightSetting(containerEl, 'internal_dead_link_density', 'Internal Dead Link Density', enabledForQuality);
         this.addWeightSetting(containerEl, 'external_link_density', 'External Link Density', enabledForQuality);
         
         this.weightSumEl = containerEl.createEl('div', { cls: 'setting-item' });
@@ -216,10 +238,12 @@ export class SettingTab extends PluginSettingTab {
         });
 
         this.addRangeSetting(containerEl, 'avg_paragraph_length', 'Average Paragraph Length', 'words');
+        this.addRangeSetting(containerEl, 'avg_chapter_length', 'Average Chapter Length', 'words');
         this.addRangeSetting(containerEl, 'lix', 'LIX', 'points');
         this.addRangeSetting(containerEl, 'question_coefficient', 'Question Coefficient', '%');
         this.addRangeSetting(containerEl, 'exclamation_coefficient', 'Exclamation Coefficient', '%');
         this.addRangeSetting(containerEl, 'internal_link_density', 'Internal Link Density', '%');
+        this.addRangeSetting(containerEl, 'internal_dead_link_density', 'Internal Dead Link Density', '%');
         this.addRangeSetting(containerEl, 'external_link_density', 'External Link Density', '%');
 
 		/*containerEl.createEl('h2', { 

@@ -43,9 +43,15 @@ You can remove calculated metrics in two ways:
 ## Metrics Description
 
 ### Average paragraph length (`avg_paragraph_length`)
-Measures how visually dense your text feels.
-- **How it’s calculated:** Total word count divided by the number of paragraphs.
-- **What it means:** High values may indicate “walls of text” that are harder to scan. Very low values can suggest fragmented or overly list-based writing.
+Shows the average length of your paragraphs.
+- **How it’s calculated:** Total word count divided by the number of paragraphs (divider - `\n\n`).
+- **What it means:** Higher values usually mean longer, denser paragraphs that may be harder to skim. Lower values mean shorter paragraphs, which can feel more broken up.
+
+---
+### Average chapter length (`avg_chapter_length`)
+Shows the average length of your chapters.
+- **How it’s calculated:** Total word count divided by the number of chapters (divider - `#`).
+- **What it means:** Higher values suggest longer sections. Lower values suggest shorter, more divided chapters.
 
 ---
 ### LIX readability (`lix`)
