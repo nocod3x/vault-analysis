@@ -1,3 +1,4 @@
+import { MetadataCache } from "obsidian";
 import { MetricRange, PluginSettings, QualityScoreConfig } from "settings";
 
 export interface Metric {
@@ -518,7 +519,7 @@ export class MetricsRegistry {
             category: 'graph',
             enabled: true,
             calculate: (content: string, sourcePath: string = ''): number => {
-                const metadataCache = (globalThis as any).app?.metadataCache;
+                const metadataCache = (globalThis as { app?: { metadataCache?: MetadataCache } }).app?.metadataCache;
                 if (!metadataCache) return 0;
 
                 const internalDeadLinks = TextUtils.getInternalDeadLinks(content, sourcePath, metadataCache).length;
