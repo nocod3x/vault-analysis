@@ -357,41 +357,76 @@ export class SettingTab extends PluginSettingTab {
 
         const settingEl = new Setting(containerEl)
             .setName(`${displayName}, ${unit}`);
-            //.setDesc(`Optimal range: ${range.optimal_min}-${range.optimal_max} ${unit}`);
 
         const rangeContainer = settingEl.controlEl.createDiv({ cls: 'metric-range-settings' });
 
-        // Optimal Min
-        rangeContainer.createEl('label', { text: 'Optimal min: ' });
-        const minInput = rangeContainer.createEl('input', {
-            type: 'number',
-            value: range.optimal_min.toString()
-        });
-        // minInput.style.width = '60px';
-        minInput.setCssProps({ width: '60px', marginRight: '10px' });
-        // minInput.style.marginRight = '10px';
-        // Optimal Max
-        rangeContainer.createEl('label', { text: 'Optimal max: ' });
-        const maxInput = rangeContainer.createEl('input', {
-            type: 'number',
-            value: range.optimal_max.toString()
-        });
-        maxInput.setCssProps({ width: '60px' });
-        // maxInput.style.width = '60px';
-
-        const updateRange = async () => {
-            const newMin = parseFloat(minInput.value);
-            const newMax = parseFloat(maxInput.value);
-            
-            if (!isNaN(newMin) && !isNaN(newMax) && newMin < newMax) {
-                this.plugin.settings.qualityScoreConfig.ranges[key].optimal_min = newMin;
-                this.plugin.settings.qualityScoreConfig.ranges[key].optimal_max = newMax;
-                await this.plugin.saveSettings();
-                this.plugin.metricsRegistry.updateQualityScoreConfig(this.plugin.settings.qualityScoreConfig);
-            }
+        const createField = (labelText: string, value: string) => {
+            const label = rangeContainer.createEl('label', { text: labelText });
+            label.setCssProps({ fontSize: '0.6em' });
+            const input = rangeContainer.createEl('input', { type: 'number', value });
+            input.setCssProps({ width: '40px', marginRight: '10px', fontSize: '0.6em' });
+            return input;
         };
 
-        minInput.addEventListener('blur', () => void updateRange);
-        maxInput.addEventListener('blur', () => void updateRange);
+        const absMinInput = createField('Min: ', range.min.toString());
+        const optMinInput = createField('Optimal min: ', range.optimal_min.toString());
+        const optMaxInput = createField('Optimal max: ', range.optimal_max.toString());
+        const absMaxInput = createField('Max: ', range.max.toString());
+
+        const errorEl = settingEl.controlEl.createDiv({ cls: 'metric-range-error' });
+        errorEl.setCssProps({ color: 'var(--text-error)', fontSize: '0.8em', marginTop: '4px', display: 'none' });
+
+        const showError = (msg: string) => {
+            errorEl.setText(msg);
+            errorEl.setCssProps({ display: 'block' });
+            [absMinInput, optMinInput, optMaxInput, absMaxInput].forEach(input =>
+                input.setCssProps({ borderColor: 'var(--text-error)' })
+            );
+        };
+
+        const clearError = () => {
+            errorEl.setText('');
+            errorEl.setCssProps({ display: 'none' });
+            [absMinInput, optMinInput, optMaxInput, absMaxInput].forEach(input =>
+                input.setCssProps({ borderColor: '' })
+            );
+        };
+
+        const updateRange = async () => {
+            const newAbsMin = parseFloat(absMinInput.value);
+            const newOptMin = parseFloat(optMinInput.value);
+            const newOptMax = parseFloat(optMaxInput.value);
+            const newAbsMax = parseFloat(absMaxInput.value);
+
+            if (isNaN(newAbsMin) || isNaN(newOptMin) || isNaN(newOptMax) || isNaN(newAbsMax)) {
+                showError('All fields must be valid numbers.');
+                return;
+            }
+            if (newAbsMin > newOptMin) {
+                showError(`Min (${newAbsMin}) must be ≤ Optimal min (${newOptMin}).`);
+                return;
+            }
+            if (newOptMin >= newOptMax) {
+                showError(`Optimal min (${newOptMin}) must be < Optimal max (${newOptMax}).`);
+                return;
+            }
+            if (newOptMax > newAbsMax) {
+                showError(`Optimal max (${newOptMax}) must be ≤ Max (${newAbsMax}).`);
+                return;
+            }
+
+            clearError();
+            this.plugin.settings.qualityScoreConfig.ranges[key].min = newAbsMin;
+            this.plugin.settings.qualityScoreConfig.ranges[key].optimal_min = newOptMin;
+            this.plugin.settings.qualityScoreConfig.ranges[key].optimal_max = newOptMax;
+            this.plugin.settings.qualityScoreConfig.ranges[key].max = newAbsMax;
+            await this.plugin.saveSettings();
+            this.plugin.metricsRegistry.updateQualityScoreConfig(this.plugin.settings.qualityScoreConfig);
+        };
+
+        absMinInput.addEventListener('blur', () => void updateRange());
+        optMinInput.addEventListener('blur', () => void updateRange());
+        optMaxInput.addEventListener('blur', () => void updateRange());
+        absMaxInput.addEventListener('blur', () => void updateRange());
     }
 }

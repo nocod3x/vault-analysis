@@ -83,6 +83,12 @@ Measures how well a note is connected within your knowledge base.
 - **What it means:** Higher density suggests strong integration with your existing notes and ideas.
 
 ---
+### Internal dead link density (`internal_dead_link_density`)
+Measures how many internal links in a note point to notes that don’t exist.
+- **How it’s calculated:** Number of dead internal links per 100 internal links.
+- **What it means:** Higher values indicate more broken references in the note. Lower values suggest that most links correctly point to existing notes.
+
+---
 ### External link density (`external_link_density`)
 Measures how much your note relies on outside sources.
 - **How it’s calculated:** Number of external URLs per 100 words.
