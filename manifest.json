@@ -2,9 +2,9 @@
 	"id": "vault-analysis",
 	"name": "Vault Analysis",
 	"version": "1.0.0",
-	"minAppVersion": "0.15.0",
-	"description": "Vault analysis plugin for Obsidian",
+	"minAppVersion": "1.3.3",
+	"description": "An Obsidian plugin for analyzing notes in your vault using structural, semantic, syntactic, and graph-based metrics",
 	"author": "nocod3x",
-	"authorUrl": "https://obsidian.md",
+	"authorUrl": "https://github.com/nocod3x",
 	"isDesktopOnly": false
 }
